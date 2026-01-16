@@ -1,0 +1,52 @@
+version: "3.8"
+
+services:
+  db:
+    image: postgres:13
+    container_name: ais-postgres
+    restart: always
+    environment:
+      TZ: Europe/Moscow
+      POSTGRES_DB: ais_db
+      POSTGRES_USER: ais_user
+      POSTGRES_PASSWORD: ais_password
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  backend:
+    image: node:18
+    container_name: ais-backend
+    working_dir: /app
+    volumes:
+      - ./ais-main:/app    # путь к бэку
+    command: sh -c "npm install && npx prisma generate && npm run dev"
+    ports:
+      - "4000:4000"        # <- порт для доступа из Windows
+      - "5555:5555"   # ← ВАЖНО для призмы
+    depends_on:
+      - db
+    environment:
+      TZ: Europe/Moscow
+      DATABASE_URL: postgresql://ais_user:ais_password@db:5432/ais_db
+      HOST: 0.0.0.0       # чтобы бэк слушал все интерфейсы
+      PORT: 4000
+      PRISMA_STUDIO_PORT: 5555
+
+  frontend:
+    image: node:18
+    container_name: ais-frontend
+    working_dir: /app
+    volumes:
+      - ./ais-frontend:/app   # путь к фронту
+    command: sh -c "npm install && npm run dev -- --host 0.0.0.0"
+    ports:
+      - "5173:5173"           # порт для браузера
+    environment:
+      VITE_API_URL: http://localhost:4000
+    depends_on:
+      - backend
+
+volumes:
+  postgres_data:

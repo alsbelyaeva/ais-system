@@ -1,0 +1,129 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String      @id @default(uuid())
+  email        String      @unique
+  passwordHash String      @map("password_hash")
+  fullName     String?     @map("full_name")
+  role         UserRole
+  createdAt    DateTime    @default(now()) @map("created_at")
+  updatedAt    DateTime    @default(now()) @updatedAt
+  deletedAt    DateTime?
+  auditLogs    AuditLog[]
+  lessons      Lesson[]
+  clients      Client[]
+  slotWeights  SlotWeight?
+}
+
+model Client {
+  id           Int           @id @default(autoincrement())
+  phone        String?
+  email        String?       @unique
+  notes        String?
+  vip          Boolean       @default(false)
+  createdAt    DateTime      @default(now()) @map("created_at")
+  deletedAt    DateTime?     @map("deleted_at")
+  fullName     String        @map("full_name")
+  tags         Json?
+  userId       String        @map("user_id")
+  lessons      Lesson[]
+  payments     Payment[]
+  slotRequests SlotRequest[]
+  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([email])
+  @@index([phone])
+  @@index([userId])
+}
+
+model Lesson {
+  id          Int          @id @default(autoincrement())
+  type        String
+  clientId    Int          @map("client_id")
+  createdAt   DateTime     @default(now()) @map("created_at")
+  durationMin Int          @map("duration_min")
+  notes       String?
+  startTime   DateTime     @map("start_time")
+  updatedAt   DateTime     @updatedAt @map("updated_at")
+  userId      String?      @map("user_id")
+  status      LessonStatus @default(PLANNED)
+  client      Client       @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  user        User?        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  payments    Payment[]
+
+  @@index([startTime])
+  @@index([userId, startTime])
+}
+
+model Payment {
+  id        Int      @id @default(autoincrement())
+  amount    Decimal  @db.Decimal(10, 2)
+  method    String
+  clientId  Int      @map("client_id")
+  createdAt DateTime @default(now()) @map("created_at")
+  dateTime  DateTime @map("date_time")
+  lessonId  Int?     @map("lesson_id")
+  note      String?
+  client    Client   @relation(fields: [clientId], references: [id])
+  lesson    Lesson?  @relation(fields: [lessonId], references: [id])
+
+  @@index([clientId])
+  @@index([dateTime])
+}
+
+model SlotRequest {
+  id            Int      @id @default(autoincrement())
+  clientId      Int      @map("client_id")
+  proposedSlots Json     @map("proposed_slots")
+  status        String   @default("PENDING")
+  createdAt     DateTime @default(now()) @map("created_at")
+  client        Client   @relation(fields: [clientId], references: [id])
+
+  @@index([clientId])
+  @@index([status])
+}
+
+model SlotWeight {
+  id                Int      @id @default(autoincrement())
+  userId            String   @unique @map("user_id")
+  wTime             Float    @default(0.33) @map("w_time")
+  wCompact          Float    @default(0.33) @map("w_compact")
+  wPriority         Float    @default(0.34) @map("w_priority")
+  workingDays       Json     @default("[1,2,3,4,5]") @map("working_days")
+  preferredTimes    Json     @default("{}") @map("preferred_times")
+  minGapMinutes     Int      @default(60) @map("min_gap_minutes")
+  maxGapMinutes     Int      @default(180) @map("max_gap_minutes")
+  gapImportance     Float    @default(0.5) @map("gap_importance")
+  createdAt         DateTime @default(now()) @map("created_at")
+  updatedAt         DateTime @updatedAt @map("updated_at")
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model AuditLog {
+  id        Int      @id @default(autoincrement())
+  userId    String?  @map("user_id")
+  action    String
+  entity    String
+  entityId  String?  @map("entity_id")
+  details   Json?
+  createdAt DateTime @default(now()) @map("created_at")
+  user      User?    @relation(fields: [userId], references: [id])
+}
+
+enum UserRole {
+  ADMIN
+  TEACHER
+}
+
+enum LessonStatus {
+  PLANNED
+  DONE
+  CANCELLED
+}
